@@ -31,7 +31,8 @@ app = Flask(__name__)
 #################################################
 # Flask Routes
 #################################################
-
+all_keys =[Measurement.id,Measurement.station, \
+    Measurement.date,Measurement.prcp,Measurement.tobs]
 @app.route("/")
 def welcome():
     """List all available api routes."""
@@ -113,12 +114,58 @@ def temperature():
         temperatures.append(dict_temp)
 
     session.close()
-   
-    
+      
     return jsonify(temperatures)
 
+# 
+# api/v1.0/<start> and /api/v1.0/<start>/<end>
+# Return a JSON list of the minimum temperature, the average temperature, 
+# and the max temperature for a given start or start-end range.
+# When given the start only, calculate TMIN, TAVG, and TMAX 
+# for all dates greater than and equal to the start date.
+# When given the start and the end date, calculate the TMIN, 
+# TAVG, and TMAX for dates between the start and end date inclusive.
+#@app.route('/api/v1.0/tobs')
+
+@app.route('/api/v1.0/start/<start>')
+@app.route('/api/v1.0/start/<start>/<end>')
+def start(start=None, end= None):
+    session = Session(engine)
+
+    if not end:
+        resluts = session.query(func.max(Measurement.tobs),\
+        func.min(Measurement.tobs),func.avg(Measurement.tobs))\
+        .filter(Measurement.date >= start).all()
 
 
+        temperatures = []
+    #For some reason the order of the Dicitionary appears in Aplabethical order
+        for temp in resluts:
+            dict_temp = {}
+            dict_temp['Beginning of Period'] = f'{start}'
+            dict_temp['Max Temp'] = temp[0]
+            dict_temp['Min Temp'] = temp[1]
+            dict_temp['Avg Temp'] = temp[2]
+            temperatures.append(dict_temp)
+    else:
+        resluts = session.query(func.max(Measurement.tobs),\
+        func.min(Measurement.tobs),func.avg(Measurement.tobs))\
+        .filter(Measurement.date.between(start,end)).all()
+
+        temperatures = []
+        for temp in resluts:
+            dict_temp = {}
+            dict_temp['Period'] = f'From {start} to {end}'
+            dict_temp['Max Temp'] = temp[0]
+            dict_temp['Min Temp'] = temp[1]
+            dict_temp['Avg Temp'] = temp[2]
+            temperatures.append(dict_temp)
+
+
+    session.close()
+    return jsonify(temperatures)
+
+    
 
 if __name__ == '__main__':
     app.run(debug=True)
